@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Decimal};
+use cosmwasm_std::Decimal;
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -11,7 +11,7 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    Trade {  },
+    Trade {},
     SetExchangeRate { exchange_rate: Decimal },
     SetOwner { owner: String },
 }
@@ -35,7 +35,7 @@ pub enum QueryMsg {
 pub struct GetExchangeInfoResponse {
     pub native_denom: String,
     pub private_denom: String,
-    pub exchange_rate: Decimal
+    pub exchange_rate: Decimal,
 }
 
 #[cw_serde]

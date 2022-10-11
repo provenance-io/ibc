@@ -38,8 +38,8 @@ mod tests {
         let mut app = mock_app();
         let cw_template_id = app.store_code(contract_template());
 
-        let msg = InstantiateMsg { 
-            native_denom: "nhash".to_string(), 
+        let msg = InstantiateMsg {
+            native_denom: "nhash".to_string(),
             private_denom: "vspn".to_string(),
             exchange_rate: Decimal::from_atomics(10, 1).unwrap(),
             marker_account: Addr::new()
