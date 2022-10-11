@@ -30,7 +30,6 @@ pub fn instantiate(
         private_denom: msg.private_denom.clone(),
         exchange_rate: msg.exchange_rate,
         owner: info.sender.clone(),
-        marker_account: deps.api.addr_validate(msg.marker_account.as_str())?,
     };
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     STATE.save(deps.storage, &state)?;
@@ -41,14 +40,13 @@ pub fn instantiate(
         .add_attribute("owner", info.sender)
         .add_attribute("native_denom", msg.native_denom)
         .add_attribute("private_denom", msg.private_denom)
-        .add_attribute("exchange_rate", msg.exchange_rate.to_string())
-        .add_attribute("marker_account", state.marker_account))
+        .add_attribute("exchange_rate", msg.exchange_rate.to_string()))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut<ProvenanceQuery>,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
@@ -60,7 +58,7 @@ pub fn execute(
         ExecuteMsg::SetExchangeRate { exchange_rate } => {
             execute::set_exchange_rate(deps, info, exchange_rate)
         }
-        ExecuteMsg::Trade {} => execute::trade(deps, env, info),
+        ExecuteMsg::Trade {} => execute::trade(deps, info),
     }
 }
 
@@ -73,7 +71,6 @@ pub mod execute {
 
     pub fn trade(
         deps: DepsMut<ProvenanceQuery>,
-        env: Env,
         info: MessageInfo,
     ) -> Result<Response<ProvenanceMsg>, ContractError> {
         // Verify they sent in exactly 1 coin in funds
@@ -93,7 +90,7 @@ pub mod execute {
         if coin.denom == state.private_denom {
             response = send_as_native(&state, coin, &info.sender)?;
         } else if coin.denom == state.native_denom {
-            response = send_as_private(&state, coin, &env.contract.address, &info.sender)?;
+            response = send_as_private(&state, coin, &info.sender)?;
         } else {
             return Err(ContractError::InvalidDenom {});
         }
@@ -160,12 +157,11 @@ pub fn query(deps: Deps<ProvenanceQuery>, _env: Env, msg: QueryMsg) -> StdResult
     match msg {
         QueryMsg::GetExchangeInfo {} => to_binary(&query::get_exchange_info(deps)?),
         QueryMsg::GetOwner {} => to_binary(&query::get_owner(deps)?),
-        QueryMsg::GetMarkerAccount {} => to_binary(&query::get_marker_account(deps)?),
     }
 }
 
 pub mod query {
-    use crate::msg::{GetExchangeInfoResponse, GetMarkerAccountResponse, GetOwnerResponse};
+    use crate::msg::{GetExchangeInfoResponse, GetOwnerResponse};
 
     use super::*;
 
@@ -173,13 +169,6 @@ pub mod query {
         let state = STATE.load(deps.storage)?;
         Ok(GetOwnerResponse {
             owner: state.owner.to_string(),
-        })
-    }
-
-    pub fn get_marker_account(deps: Deps<ProvenanceQuery>) -> StdResult<GetMarkerAccountResponse> {
-        let state = STATE.load(deps.storage)?;
-        Ok(GetMarkerAccountResponse {
-            marker_account: state.marker_account.to_string(),
         })
     }
 
@@ -196,16 +185,14 @@ pub mod query {
 #[cfg(test)]
 mod tests {
 
-    use crate::msg::{GetExchangeInfoResponse, GetMarkerAccountResponse, GetOwnerResponse};
+    use crate::msg::{GetExchangeInfoResponse, GetOwnerResponse};
 
     use super::*;
     use cosmwasm_std::testing::{mock_env, mock_info};
     use cosmwasm_std::CosmosMsg::Bank;
     use cosmwasm_std::{from_binary, Attribute, BankMsg, Coin, Uint128};
     use provwasm_mocks::mock_dependencies;
-    use provwasm_std::{
-        burn_marker_supply, mint_marker_supply, transfer_marker_coins, withdraw_coins,
-    };
+    use provwasm_std::{burn_marker_supply, mint_marker_supply, withdraw_coins};
 
     #[test]
     fn proper_initialization() {
@@ -215,14 +202,13 @@ mod tests {
             native_denom: "denom1".to_string(),
             private_denom: "denom2".to_string(),
             exchange_rate: Decimal::from_atomics(Uint128::new(10), 1).unwrap(),
-            marker_account: "tp15h7xkfj4v549sfdu0gxl9wltc85lywhjdxt6xu".to_string(),
         };
         let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
 
         // Verify we have all the attributes
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(7, res.attributes.len());
+        assert_eq!(6, res.attributes.len());
         assert_eq!(
             Attribute::new("action", "provwasm.contracts.exchange.init"),
             res.attributes[0]
@@ -243,26 +229,11 @@ mod tests {
             ),
             res.attributes[5]
         );
-        assert_eq!(
-            Attribute::new(
-                "marker_account",
-                "tp15h7xkfj4v549sfdu0gxl9wltc85lywhjdxt6xu"
-            ),
-            res.attributes[6]
-        );
 
         // Check the owner
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetOwner {}).unwrap();
         let value: GetOwnerResponse = from_binary(&res).unwrap();
         assert_eq!("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", value.owner);
-
-        // Check the marker account
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetMarkerAccount {}).unwrap();
-        let value: GetMarkerAccountResponse = from_binary(&res).unwrap();
-        assert_eq!(
-            "tp15h7xkfj4v549sfdu0gxl9wltc85lywhjdxt6xu",
-            value.marker_account
-        );
 
         // Check the native_denom, private_denom, and exchange_rate
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetExchangeInfo {}).unwrap();
@@ -283,7 +254,6 @@ mod tests {
             native_denom: "denom1".to_string(),
             private_denom: "denom2".to_string(),
             exchange_rate: Decimal::from_atomics(Uint128::new(0), 0).unwrap(),
-            marker_account: "tp15h7xkfj4v549sfdu0gxl9wltc85lywhjdxt6xu".to_string(),
         };
         let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
 
@@ -303,7 +273,6 @@ mod tests {
             native_denom: "denom1".to_string(),
             private_denom: "denom2".to_string(),
             exchange_rate: Decimal::from_atomics(Uint128::new(10), 1).unwrap(),
-            marker_account: "tp15h7xkfj4v549sfdu0gxl9wltc85lywhjdxt6xu".to_string(),
         };
         let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -363,7 +332,6 @@ mod tests {
             native_denom: "denom1".to_string(),
             private_denom: "denom2".to_string(),
             exchange_rate: Decimal::from_atomics(Uint128::new(10), 1).unwrap(),
-            marker_account: "tp15h7xkfj4v549sfdu0gxl9wltc85lywhjdxt6xu".to_string(),
         };
         let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -451,7 +419,6 @@ mod tests {
             native_denom: "denom1".to_string(),
             private_denom: "denom2".to_string(),
             exchange_rate: Decimal::from_atomics(Uint128::new(20), 1).unwrap(),
-            marker_account: "tp15h7xkfj4v549sfdu0gxl9wltc85lywhjdxt6xu".to_string(),
         };
         let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -508,7 +475,7 @@ mod tests {
         );
         let msg = ExecuteMsg::Trade {};
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(3, res.messages.len());
+        assert_eq!(2, res.messages.len());
         assert_eq!(4, res.attributes.len());
         assert_eq!(
             Attribute::new("action", "provwasm.contracts.exchange.trade"),
@@ -532,16 +499,8 @@ mod tests {
             Addr::unchecked("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h"),
         )
         .unwrap();
-        let transfer = transfer_marker_coins(
-            5 as u128,
-            "denom2",
-            Addr::unchecked("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h"),
-            mock_env().contract.address,
-        )
-        .unwrap();
         assert_eq!(mint, res.messages[0].msg);
         assert_eq!(withdraw, res.messages[1].msg);
-        assert_eq!(transfer, res.messages[2].msg);
 
         // Exchange private to native
         let info = mock_info(

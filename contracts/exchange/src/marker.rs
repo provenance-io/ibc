@@ -1,8 +1,6 @@
 use cosmwasm_std::CosmosMsg::Bank;
 use cosmwasm_std::{Addr, BankMsg, Coin, Decimal, Response};
-use provwasm_std::{
-    burn_marker_supply, mint_marker_supply, transfer_marker_coins, withdraw_coins, ProvenanceMsg,
-};
+use provwasm_std::{burn_marker_supply, mint_marker_supply, withdraw_coins, ProvenanceMsg};
 
 use crate::state::State;
 use crate::ContractError;
@@ -30,7 +28,6 @@ pub fn send_as_native(
 pub fn send_as_private(
     state: &State,
     coin: &Coin,
-    from: &Addr,
     to: &Addr,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let private = convert(state, coin)?;
@@ -41,17 +38,10 @@ pub fn send_as_private(
         private.denom.clone(),
         to.clone(),
     )?;
-    let transfer = transfer_marker_coins(
-        private.amount.u128(),
-        &private.denom,
-        to.clone(),
-        from.clone(),
-    )?;
 
     Ok(Response::new()
         .add_message(mint)
         .add_message(withdraw)
-        .add_message(transfer)
         .add_attribute("action", "provwasm.contracts.exchange.trade")
         .add_attribute("integration_test", "v1")
         .add_attribute("send", coin.to_string())

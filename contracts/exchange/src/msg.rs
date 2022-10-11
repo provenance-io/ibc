@@ -6,7 +6,6 @@ pub struct InstantiateMsg {
     pub native_denom: String,
     pub private_denom: String,
     pub exchange_rate: Decimal,
-    pub marker_account: String,
 }
 
 #[cw_serde]
@@ -25,9 +24,6 @@ pub enum QueryMsg {
 
     #[returns(GetOwnerResponse)]
     GetOwner {},
-
-    #[returns(GetMarkerAccountResponse)]
-    GetMarkerAccount {},
 }
 
 // We define a custom struct for each query response
@@ -41,9 +37,4 @@ pub struct GetExchangeInfoResponse {
 #[cw_serde]
 pub struct GetOwnerResponse {
     pub owner: String,
-}
-
-#[cw_serde]
-pub struct GetMarkerAccountResponse {
-    pub marker_account: String,
 }

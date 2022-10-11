@@ -5,9 +5,7 @@ use cosmwasm_std::{
     to_binary, Addr, CosmosMsg, CustomQuery, Querier, QuerierWrapper, StdResult, WasmMsg, WasmQuery,
 };
 
-use crate::msg::{
-    ExecuteMsg, GetExchangeInfoResponse, GetMarkerAccountResponse, GetOwnerResponse, QueryMsg,
-};
+use crate::msg::{ExecuteMsg, GetExchangeInfoResponse, GetOwnerResponse, QueryMsg};
 
 /// CwTemplateContract is a wrapper around Addr that provides a lot of helpers
 /// for working with this.
@@ -60,23 +58,6 @@ impl CwTemplateContract {
         }
         .into();
         let res: GetOwnerResponse = QuerierWrapper::<CQ>::new(querier).query(&query)?;
-        Ok(res)
-    }
-
-    /// Get Owner
-    pub fn get_marker_account<Q, T, CQ>(&self, querier: &Q) -> StdResult<GetMarkerAccountResponse>
-    where
-        Q: Querier,
-        T: Into<String>,
-        CQ: CustomQuery,
-    {
-        let msg = QueryMsg::GetOwner {};
-        let query = WasmQuery::Smart {
-            contract_addr: self.addr().into(),
-            msg: to_binary(&msg)?,
-        }
-        .into();
-        let res: GetMarkerAccountResponse = QuerierWrapper::<CQ>::new(querier).query(&query)?;
         Ok(res)
     }
 }
