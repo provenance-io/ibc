@@ -10,6 +10,7 @@ pub struct State {
     pub native_denom: String,
     pub private_denom: String,
     pub exchange_rate: Decimal,
+    pub marker_address: Addr,
 }
 
 pub const STATE: Item<State> = Item::new("state");
