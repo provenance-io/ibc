@@ -77,13 +77,28 @@ pub mod execute {
         info: MessageInfo,
         coin: Coin,
     ) -> Result<Response<ProvenanceMsg>, ContractError> {
+        let state = STATE.load(deps.storage)?;
+        let response;
+
         // Verify we have a valid amount to be traded
         if coin.amount == Uint128::new(0) {
             return Err(ContractError::InvalidFundsAmountError {});
         }
 
-        let state = STATE.load(deps.storage)?;
-        let response;
+        // Make sure we don't have more than one thing in amount
+        if info.funds.len() > 1 {
+            return Err(ContractError::InvalidFundsError {});
+        }
+
+        // If there is one thing make sure the coins match
+        if info.funds.len() == 1 && info.funds[0] != coin {
+            return Err(ContractError::InvalidFundsError {});
+        }
+
+        // If funds are specified then it must be the native denom
+        if info.funds.len() == 1 && info.funds[0].denom != state.native_denom {
+            return Err(ContractError::InvalidFundsError {});
+        }
 
         if coin.denom == state.private_denom {
             response = send_as_native(
@@ -94,6 +109,7 @@ pub mod execute {
                 &state.marker_address,
             )?;
         } else if coin.denom == state.native_denom {
+            // We want to pass in is_marker here
             response = send_as_private(&state, &coin, &env.contract.address, &info.sender)?;
         } else {
             return Err(ContractError::InvalidDenom {});
@@ -190,11 +206,11 @@ pub mod query {
 #[cfg(test)]
 mod tests {
 
-    use crate::msg::{GetExchangeInfoResponse, GetOwnerResponse};
-
     use super::*;
+    use crate::msg::{GetExchangeInfoResponse, GetOwnerResponse};
     use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::{from_binary, Attribute, Coin, Uint128};
+    use cosmwasm_std::CosmosMsg::Bank;
+    use cosmwasm_std::{from_binary, Attribute, BankMsg, Coin, Uint128};
     use provwasm_mocks::mock_dependencies;
     use provwasm_std::{
         burn_marker_supply, mint_marker_supply, transfer_marker_coins, withdraw_coins,
@@ -475,13 +491,58 @@ mod tests {
             _ => panic!("Must return invalid funds amount error"),
         }
 
+        // Fund denom does not match
+        let info = mock_info(
+            "tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h",
+            &[Coin::new(1, "denom2")],
+        );
+        let msg = ExecuteMsg::Trade {
+            coin: Coin::new(1, "denom1"),
+        };
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::InvalidFundsError {}) => {}
+            _ => panic!("Must return invalid funds amount error"),
+        }
+
+        // Fund amount does not match
+        let info = mock_info(
+            "tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h",
+            &[Coin::new(2, "denom1")],
+        );
+        let msg = ExecuteMsg::Trade {
+            coin: Coin::new(1, "denom1"),
+        };
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::InvalidFundsError {}) => {}
+            _ => panic!("Must return invalid funds amount error"),
+        }
+
+        // Fund must be native denom
+        let info = mock_info(
+            "tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h",
+            &[Coin::new(1, "denom2")],
+        );
+        let msg = ExecuteMsg::Trade {
+            coin: Coin::new(2, "denom2"),
+        };
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::InvalidFundsError {}) => {}
+            _ => panic!("Must return invalid funds amount error"),
+        }
+
         // Exchange native to private
-        let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
+        let info = mock_info(
+            "tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h",
+            &[Coin::new(10, "denom1")],
+        );
         let msg = ExecuteMsg::Trade {
             coin: Coin::new(10, "denom1"),
         };
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(3, res.messages.len());
+        assert_eq!(2, res.messages.len());
         assert_eq!(4, res.attributes.len());
         assert_eq!(
             Attribute::new("action", "provwasm.contracts.exchange.trade"),
@@ -497,13 +558,6 @@ mod tests {
             res.attributes[3]
         );
 
-        let transfer = transfer_marker_coins(
-            10 as u128,
-            "denom1",
-            mock_env().contract.address,
-            Addr::unchecked("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h"),
-        )
-        .unwrap();
         let mint = mint_marker_supply(5 as u128, "denom2").unwrap();
         let withdraw = withdraw_coins(
             "denom2",
@@ -512,9 +566,8 @@ mod tests {
             Addr::unchecked("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h"),
         )
         .unwrap();
-        assert_eq!(transfer, res.messages[0].msg);
-        assert_eq!(mint, res.messages[1].msg);
-        assert_eq!(withdraw, res.messages[2].msg);
+        assert_eq!(mint, res.messages[0].msg);
+        assert_eq!(withdraw, res.messages[1].msg);
 
         // Exchange private to native
         let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
@@ -546,13 +599,10 @@ mod tests {
             Addr::unchecked("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h"),
         )
         .unwrap();
-        let transfer_native = transfer_marker_coins(
-            20 as u128,
-            "denom1",
-            Addr::unchecked("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h"),
-            mock_env().contract.address,
-        )
-        .unwrap();
+        let transfer_native = Bank(BankMsg::Send {
+            amount: vec![Coin::new(20, "denom1")],
+            to_address: "tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h".to_string(),
+        });
         assert_eq!(transfer_private, res.messages[0].msg);
         assert_eq!(burn, res.messages[1].msg);
         assert_eq!(transfer_native, res.messages[2].msg);

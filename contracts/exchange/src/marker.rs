@@ -1,4 +1,5 @@
-use cosmwasm_std::{Addr, Coin, Decimal, Response};
+use cosmwasm_std::CosmosMsg::Bank;
+use cosmwasm_std::{Addr, BankMsg, Coin, Decimal, Response};
 use provwasm_std::{
     burn_marker_supply, mint_marker_supply, transfer_marker_coins, withdraw_coins, ProvenanceMsg,
 };
@@ -9,7 +10,7 @@ use crate::ContractError;
 pub fn send_as_native(
     state: &State,
     private: &Coin,
-    contract: &Addr,
+    _contract: &Addr,
     sender: &Addr,
     marker: &Addr,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
@@ -22,12 +23,10 @@ pub fn send_as_native(
         marker.clone(),
         sender.clone(),
     )?;
-    let native_transfer = transfer_marker_coins(
-        native.amount.u128(),
-        &native.denom,
-        sender.clone(),
-        contract.clone(),
-    )?;
+    let native_transfer = Bank(BankMsg::Send {
+        amount: vec![native.clone()],
+        to_address: sender.to_string(),
+    });
 
     Ok(Response::new()
         .add_message(private_transfer)
@@ -42,7 +41,7 @@ pub fn send_as_native(
 pub fn send_as_private(
     state: &State,
     native: &Coin,
-    contract: &Addr,
+    _contract: &Addr,
     sender: &Addr,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let private = convert(state, native)?;
@@ -53,15 +52,8 @@ pub fn send_as_private(
         private.denom.clone(),
         sender.clone(),
     )?;
-    let transfer = transfer_marker_coins(
-        native.amount.u128(),
-        &native.denom,
-        contract.clone(),
-        sender.clone(),
-    )?;
 
     Ok(Response::new()
-        .add_message(transfer)
         .add_message(mint)
         .add_message(withdraw)
         .add_attribute("action", "provwasm.contracts.exchange.trade")
