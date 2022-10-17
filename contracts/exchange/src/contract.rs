@@ -345,7 +345,7 @@ mod tests {
     }
 
     #[test]
-    fn proper_trade() {
+    fn invalid_trade_denom() {
         // Create the contract
         let mut deps = mock_dependencies(&[]);
         let msg = InstantiateMsg {
@@ -367,6 +367,20 @@ mod tests {
             Err(ContractError::InvalidDenom {}) => {}
             _ => panic!("Must return invalid denom error"),
         }
+    }
+
+    #[test]
+    fn invalid_trade_denom_amount() {
+        // Create the contract
+        let mut deps = mock_dependencies(&[]);
+        let msg = InstantiateMsg {
+            native_denom: "denom1".to_string(),
+            private_denom: "denom2".to_string(),
+            exchange_rate: Decimal::from_atomics(Uint128::new(20), 1).unwrap(),
+            marker_address: "tp1kn7phy33x5pqpax6t9n60tkjtuqf5jt37txe0h".to_string(),
+        };
+        let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Error with invalid denom
         let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
@@ -378,6 +392,20 @@ mod tests {
             Err(ContractError::InvalidFundsAmountError {}) => {}
             _ => panic!("Must return invalid funds amount error"),
         }
+    }
+
+    #[test]
+    fn trade_fund_denom_does_not_match() {
+        // Create the contract
+        let mut deps = mock_dependencies(&[]);
+        let msg = InstantiateMsg {
+            native_denom: "denom1".to_string(),
+            private_denom: "denom2".to_string(),
+            exchange_rate: Decimal::from_atomics(Uint128::new(20), 1).unwrap(),
+            marker_address: "tp1kn7phy33x5pqpax6t9n60tkjtuqf5jt37txe0h".to_string(),
+        };
+        let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Fund denom does not match
         let info = mock_info(
@@ -392,6 +420,20 @@ mod tests {
             Err(ContractError::InvalidFundsError {}) => {}
             _ => panic!("Must return invalid funds amount error"),
         }
+    }
+
+    #[test]
+    fn trade_fund_amount_does_not_match() {
+        // Create the contract
+        let mut deps = mock_dependencies(&[]);
+        let msg = InstantiateMsg {
+            native_denom: "denom1".to_string(),
+            private_denom: "denom2".to_string(),
+            exchange_rate: Decimal::from_atomics(Uint128::new(20), 1).unwrap(),
+            marker_address: "tp1kn7phy33x5pqpax6t9n60tkjtuqf5jt37txe0h".to_string(),
+        };
+        let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Fund amount does not match
         let info = mock_info(
@@ -406,6 +448,20 @@ mod tests {
             Err(ContractError::InvalidFundsError {}) => {}
             _ => panic!("Must return invalid funds amount error"),
         }
+    }
+
+    #[test]
+    fn trade_fund_must_exist_for_native() {
+        // Create the contract
+        let mut deps = mock_dependencies(&[]);
+        let msg = InstantiateMsg {
+            native_denom: "denom1".to_string(),
+            private_denom: "denom2".to_string(),
+            exchange_rate: Decimal::from_atomics(Uint128::new(20), 1).unwrap(),
+            marker_address: "tp1kn7phy33x5pqpax6t9n60tkjtuqf5jt37txe0h".to_string(),
+        };
+        let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Fund amount must be added for native
         let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
@@ -417,6 +473,20 @@ mod tests {
             Err(ContractError::InvalidFundsError {}) => {}
             _ => panic!("Must return invalid funds amount error"),
         }
+    }
+
+    #[test]
+    fn trade_fund_denom_must_match_native() {
+        // Create the contract
+        let mut deps = mock_dependencies(&[]);
+        let msg = InstantiateMsg {
+            native_denom: "denom1".to_string(),
+            private_denom: "denom2".to_string(),
+            exchange_rate: Decimal::from_atomics(Uint128::new(20), 1).unwrap(),
+            marker_address: "tp1kn7phy33x5pqpax6t9n60tkjtuqf5jt37txe0h".to_string(),
+        };
+        let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Fund must be native denom
         let info = mock_info(
@@ -431,6 +501,20 @@ mod tests {
             Err(ContractError::InvalidFundsError {}) => {}
             _ => panic!("Must return invalid funds amount error"),
         }
+    }
+
+    #[test]
+    fn proper_trade_native_to_private() {
+        // Create the contract
+        let mut deps = mock_dependencies(&[]);
+        let msg = InstantiateMsg {
+            native_denom: "denom1".to_string(),
+            private_denom: "denom2".to_string(),
+            exchange_rate: Decimal::from_atomics(Uint128::new(20), 1).unwrap(),
+            marker_address: "tp1kn7phy33x5pqpax6t9n60tkjtuqf5jt37txe0h".to_string(),
+        };
+        let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Exchange native to private
         let info = mock_info(
@@ -467,6 +551,20 @@ mod tests {
         .unwrap();
         assert_eq!(mint, res.messages[0].msg);
         assert_eq!(withdraw, res.messages[1].msg);
+    }
+
+    #[test]
+    fn proper_trade_private_to_native() {
+        // Create the contract
+        let mut deps = mock_dependencies(&[]);
+        let msg = InstantiateMsg {
+            native_denom: "denom1".to_string(),
+            private_denom: "denom2".to_string(),
+            exchange_rate: Decimal::from_atomics(Uint128::new(20), 1).unwrap(),
+            marker_address: "tp1kn7phy33x5pqpax6t9n60tkjtuqf5jt37txe0h".to_string(),
+        };
+        let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Exchange private to native
         let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
@@ -505,6 +603,20 @@ mod tests {
         assert_eq!(transfer_private, res.messages[0].msg);
         assert_eq!(burn, res.messages[1].msg);
         assert_eq!(transfer_native, res.messages[2].msg);
+    }
+
+    #[test]
+    fn proper_trade_native_unrestricted_marker_to_private() {
+        // Create the contract
+        let mut deps = mock_dependencies(&[]);
+        let msg = InstantiateMsg {
+            native_denom: "denom1".to_string(),
+            private_denom: "denom2".to_string(),
+            exchange_rate: Decimal::from_atomics(Uint128::new(20), 1).unwrap(),
+            marker_address: "tp1kn7phy33x5pqpax6t9n60tkjtuqf5jt37txe0h".to_string(),
+        };
+        let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Exchange native (Marker unrestricted) to private
         let marker = create_marker("denom1", false);
@@ -543,6 +655,20 @@ mod tests {
         .unwrap();
         assert_eq!(mint, res.messages[0].msg);
         assert_eq!(withdraw, res.messages[1].msg);
+    }
+
+    #[test]
+    fn proper_trade_private_to_unrestricted_native_marker() {
+        // Create the contract
+        let mut deps = mock_dependencies(&[]);
+        let msg = InstantiateMsg {
+            native_denom: "denom1".to_string(),
+            private_denom: "denom2".to_string(),
+            exchange_rate: Decimal::from_atomics(Uint128::new(20), 1).unwrap(),
+            marker_address: "tp1kn7phy33x5pqpax6t9n60tkjtuqf5jt37txe0h".to_string(),
+        };
+        let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Exchange private to native (Marker unrestricted)
         let marker = create_marker("denom1", false);
@@ -583,6 +709,20 @@ mod tests {
         assert_eq!(transfer_private, res.messages[0].msg);
         assert_eq!(burn, res.messages[1].msg);
         assert_eq!(transfer_native, res.messages[2].msg);
+    }
+
+    #[test]
+    fn proper_trade_restricted_native_marker_to_private() {
+        // Create the contract
+        let mut deps = mock_dependencies(&[]);
+        let msg = InstantiateMsg {
+            native_denom: "denom1".to_string(),
+            private_denom: "denom2".to_string(),
+            exchange_rate: Decimal::from_atomics(Uint128::new(20), 1).unwrap(),
+            marker_address: "tp1kn7phy33x5pqpax6t9n60tkjtuqf5jt37txe0h".to_string(),
+        };
+        let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Exchange native (Marker restricted) to private
         let marker = create_marker("denom1", true);
@@ -629,8 +769,24 @@ mod tests {
         assert_eq!(transfer_native, res.messages[0].msg);
         assert_eq!(mint, res.messages[1].msg);
         assert_eq!(withdraw, res.messages[2].msg);
+    }
+
+    #[test]
+    fn proper_trade_private_to_restricted_native_marker() {
+        // Create the contract
+        let mut deps = mock_dependencies(&[]);
+        let msg = InstantiateMsg {
+            native_denom: "denom1".to_string(),
+            private_denom: "denom2".to_string(),
+            exchange_rate: Decimal::from_atomics(Uint128::new(20), 1).unwrap(),
+            marker_address: "tp1kn7phy33x5pqpax6t9n60tkjtuqf5jt37txe0h".to_string(),
+        };
+        let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Exchange private to native (Marker restricted)
+        let marker = create_marker("denom1", true);
+        deps.querier.with_markers(vec![marker]);
         let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
         let msg = ExecuteMsg::Trade {
             coin: Coin::new(10, "denom2"),
