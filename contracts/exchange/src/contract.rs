@@ -79,24 +79,28 @@ mod tests {
     use cosmwasm_std::testing::{mock_env, mock_info};
     use cosmwasm_std::CosmosMsg::Bank;
     use cosmwasm_std::{from_binary, Addr, Attribute, BankMsg, Coin, Decimal, Uint128};
-    use provwasm_mocks::{mock_dependencies};
+    use provwasm_mocks::mock_dependencies;
     use provwasm_std::{
         burn_marker_supply, mint_marker_supply, transfer_marker_coins, withdraw_coins, Marker,
     };
 
     fn create_marker(denom: &str, restricted: bool) -> Marker {
-        Marker { 
-            address: Addr::unchecked("test".to_string()), 
-            coins: Vec::new(), 
-            account_number: 100, 
-            sequence: 100, 
-            manager: "test".to_string(), 
-            permissions: Vec::new(), 
-            status: provwasm_std::MarkerStatus::Active, 
-            denom: denom.to_string(), 
-            total_supply: Decimal::from_atomics(Uint128::new(100), 0).unwrap(), 
-            marker_type: if restricted {provwasm_std::MarkerType::Restricted} else {provwasm_std::MarkerType::Coin}, 
-            supply_fixed: true 
+        Marker {
+            address: Addr::unchecked("test".to_string()),
+            coins: Vec::new(),
+            account_number: 100,
+            sequence: 100,
+            manager: "test".to_string(),
+            permissions: Vec::new(),
+            status: provwasm_std::MarkerStatus::Active,
+            denom: denom.to_string(),
+            total_supply: Decimal::from_atomics(Uint128::new(100), 0).unwrap(),
+            marker_type: if restricted {
+                provwasm_std::MarkerType::Restricted
+            } else {
+                provwasm_std::MarkerType::Coin
+            },
+            supply_fixed: true,
         }
     }
 
@@ -502,7 +506,6 @@ mod tests {
         assert_eq!(burn, res.messages[1].msg);
         assert_eq!(transfer_native, res.messages[2].msg);
 
-
         // Exchange native (Marker unrestricted) to private
         let marker = create_marker("denom1", false);
         deps.querier.with_markers(vec![marker]);
@@ -581,8 +584,6 @@ mod tests {
         assert_eq!(burn, res.messages[1].msg);
         assert_eq!(transfer_native, res.messages[2].msg);
 
-        
-
         // Exchange native (Marker restricted) to private
         let marker = create_marker("denom1", true);
         deps.querier.with_markers(vec![marker]);
@@ -628,8 +629,6 @@ mod tests {
         assert_eq!(transfer_native, res.messages[0].msg);
         assert_eq!(mint, res.messages[1].msg);
         assert_eq!(withdraw, res.messages[2].msg);
-
-
 
         // Exchange private to native (Marker restricted)
         let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
