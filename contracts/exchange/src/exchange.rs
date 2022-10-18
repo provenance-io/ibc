@@ -27,21 +27,20 @@ pub fn exchange_for_native(
         sender.clone(),
     )?;
 
-    let native_transfer;
-    if is_restricted_marker(deps, &native) {
-        native_transfer = transfer_marker_coins(
+    let native_transfer = if is_restricted_marker(deps, &native) {
+        transfer_marker_coins(
             native.amount.u128(),
             &native.denom,
             sender.clone(),
             contract.clone(),
-        )?;
+        )?
     } else {
         // If it's not a restricted marker we can do this
-        native_transfer = Bank(BankMsg::Send {
+        Bank(BankMsg::Send {
             amount: vec![native.clone()],
             to_address: sender.to_string(),
-        });
-    }
+        })
+    };
 
     Ok(Response::new()
         .add_message(private_transfer)

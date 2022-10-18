@@ -1,5 +1,6 @@
 use crate::{
     exchange::{exchange_for_native, exchange_for_private},
+    marker::is_restricted_marker,
     state::STATE,
     ContractError,
 };
@@ -36,7 +37,10 @@ pub fn trade(
     }
 
     // Must specify funds for native
-    if coin.denom == state.native_denom && info.funds.is_empty() {
+    if coin.denom == state.native_denom
+        && info.funds.is_empty()
+        && !is_restricted_marker(&deps, &coin)
+    {
         return Err(ContractError::InvalidFundsError {});
     }
 

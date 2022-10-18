@@ -727,10 +727,7 @@ mod tests {
         // Exchange native (Marker restricted) to private
         let marker = create_marker("denom1", true);
         deps.querier.with_markers(vec![marker]);
-        let info = mock_info(
-            "tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h",
-            &[Coin::new(10, "denom1")],
-        );
+        let info = mock_info("tp1w9fnesmguvlal3mp62na3f58zww9jtmtwfnx9h", &[]);
         let msg = ExecuteMsg::Trade {
             coin: Coin::new(10, "denom1"),
         };
