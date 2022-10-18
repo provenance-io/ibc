@@ -4,9 +4,6 @@ This is a CosmWasm smart contract that acts as an exchange between a denominatio
 and a marker denom on the chain. The native and private (restricted) denominations
 along with their exchange rate can be configured at initialization.
 
-The contract only allows a `denom <-> restricted marker` transfer. We plan to upgrade this and allow
-`any <-> restricted marker` transfer.
-
 ## Init
 
 In order to create the contract you must pass in the InstantiateMsg with the following args.
@@ -28,8 +25,7 @@ to private_denom. A 1:1 ratio is an exchange_rate of "1.0".
 
 The following messages can be used to interact with the contract.
 
-`Trade {coin: Coin}` - Takes in a coin and exchanges it for either the opposite one. The --amount flag MUST be included if the native_denom
-is the coin being sent in.
+`Trade {coin: Coin}` - Takes in a coin and exchanges it for either the opposite one. If the native denom is NOT a restricted denom, then the --amount flag MUST be included when attempting to trade a native denom for a private denom.
 `SetExchangeRate {exchange_rate: Decimal}` - Changes the exchange rate on the contract. It can only be set by the owner.
 `SetOwner {owner: String}` - Changes the owner of the contract. It can only be set by the owner.
 
