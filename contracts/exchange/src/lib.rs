@@ -1,6 +1,5 @@
 pub mod contract;
 mod error;
-pub mod exchange;
 pub mod execute;
 pub mod helpers;
 pub mod integration_tests;

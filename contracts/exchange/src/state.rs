@@ -1,15 +1,13 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, Decimal};
+use cosmwasm_std::Addr;
 use cw_storage_plus::Item;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct State {
-    pub owner: Addr,
+    pub collateral_denom: String,
     pub native_denom: String,
-    pub private_denom: String,
-    pub exchange_rate: Decimal,
     pub marker_address: Addr,
 }
 
