@@ -2,6 +2,7 @@ use cosmwasm_std::{
     entry_point, to_binary, CosmosMsg, Deps, DepsMut, Env, IbcMsg, MessageInfo, Order,
     QueryResponse, Response, StdError, StdResult,
 };
+use provwasm_std::create_marker;
 
 use crate::ibc::PACKET_LIFETIME;
 use crate::ibc_msg::PacketMsg;
@@ -31,6 +32,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
         ExecuteMsg::SendMsgs { channel_id, msgs } => {
             handle_send_msgs(deps, env, info, channel_id, msgs)
+        }
+        ExecuteMsg::ProvenanceTest { channel_id } => {
+            handle_provenance_test(deps, env, info, channel_id)
         }
         ExecuteMsg::CheckRemoteBalance { channel_id } => {
             handle_check_remote_balance(deps, env, info, channel_id)
@@ -77,6 +81,35 @@ pub fn handle_send_msgs(
 
     // construct a packet to send
     let packet = PacketMsg::Dispatch { msgs };
+    let msg = IbcMsg::SendPacket {
+        channel_id,
+        data: to_binary(&packet)?,
+        timeout: env.block.time.plus_seconds(PACKET_LIFETIME).into(),
+    };
+
+    let res = Response::new()
+        .add_message(msg)
+        .add_attribute("action", "handle_send_msgs");
+    Ok(res)
+}
+
+pub fn handle_provenance_test(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    channel_id: String,
+) -> StdResult<Response> {
+    // auth check
+    let cfg = config(deps.storage).load()?;
+    if info.sender != cfg.admin {
+        return Err(StdError::generic_err("Only admin may send messages"));
+    }
+    // ensure the channel exists (not found if not registered)
+    accounts(deps.storage).load(channel_id.as_bytes())?;
+
+    // construct a packet to send
+    let msg = create_marker(100, "test", provwasm_std::MarkerType::Coin).unwrap();
+    let packet = PacketMsg::ProvenanceDispatch { msg };
     let msg = IbcMsg::SendPacket {
         channel_id,
         data: to_binary(&packet)?,

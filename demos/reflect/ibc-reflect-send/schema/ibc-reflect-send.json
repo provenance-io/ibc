@@ -66,6 +66,27 @@
       {
         "type": "object",
         "required": [
+          "provenance_test"
+        ],
+        "properties": {
+          "provenance_test": {
+            "type": "object",
+            "required": [
+              "channel_id"
+            ],
+            "properties": {
+              "channel_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
           "check_remote_balance"
         ],
         "properties": {

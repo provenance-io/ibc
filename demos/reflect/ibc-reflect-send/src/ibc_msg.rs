@@ -1,12 +1,14 @@
 use cosmwasm_std::{Coin, ContractResult, CosmosMsg};
+use provwasm_std::ProvenanceMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// This is the message we send over the IBC channel
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PacketMsg {
     Dispatch { msgs: Vec<CosmosMsg> },
+    ProvenanceDispatch { msg: CosmosMsg<ProvenanceMsg> },
     WhoAmI {},
     Balances {},
 }

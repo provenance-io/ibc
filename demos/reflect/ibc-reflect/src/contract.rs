@@ -6,6 +6,7 @@ use cosmwasm_std::{
     QueryResponse, Reply, Response, StdError, StdResult, SubMsg, SubMsgResponse, SubMsgResult,
     WasmMsg,
 };
+use provwasm_std::ProvenanceMsg;
 
 use crate::msg::{
     AccountInfo, AccountResponse, AcknowledgementMsg, BalancesResponse, DispatchResponse,
@@ -244,6 +245,7 @@ pub fn ibc_packet_receive(
             PacketMsg::Dispatch { msgs } => receive_dispatch(deps, caller, msgs),
             PacketMsg::WhoAmI {} => receive_who_am_i(deps, caller),
             PacketMsg::Balances {} => receive_balances(deps, caller),
+            PacketMsg::DispatchProvenance { msg } => receive_provenance_dispatch(deps, caller, msg),
         }
     })()
     .or_else(|e| {
@@ -306,6 +308,29 @@ fn receive_dispatch(
         .set_ack(acknowledgement)
         .add_submessage(msg)
         .add_attribute("action", "receive_dispatch"))
+}
+
+fn receive_provenance_dispatch(
+    deps: DepsMut,
+    caller: String,
+    msg: CosmosMsg<ProvenanceMsg>,
+) -> StdResult<IbcReceiveResponse> {
+    // what is the reflect contract here
+    let reflect_addr = accounts(deps.storage).load(caller.as_bytes())?;
+
+    // let them know we're fine
+    let acknowledgement = to_binary(&AcknowledgementMsg::<DispatchResponse>::Ok(()))?;
+    // create the message to re-dispatch to the reflect contract
+    let reflect_msg = ReflectExecuteMsg::ProvenanceReflectMsg { msg };
+    let wasm_msg = wasm_execute(reflect_addr, &reflect_msg, vec![])?;
+
+    // we wrap it in a submessage to properly report errors
+    let msg = SubMsg::reply_on_error(wasm_msg, RECEIVE_DISPATCH_ID);
+
+    Ok(IbcReceiveResponse::new()
+        .set_ack(acknowledgement)
+        .add_submessage(msg)
+        .add_attribute("action", "receive_provenance_dispatch"))
 }
 
 #[entry_point]

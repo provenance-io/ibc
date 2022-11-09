@@ -1,5 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Binary, CosmosMsg, CustomQuery, QueryRequest, SubMsg};
+use provwasm_std::ProvenanceMsg;
 
 #[cw_serde]
 pub struct InstantiateMsg {}
@@ -7,6 +8,7 @@ pub struct InstantiateMsg {}
 #[cw_serde]
 pub enum ExecuteMsg {
     ReflectMsg { msgs: Vec<CosmosMsg<CustomMsg>> },
+    ReflectProvenanceMsg { msg: CosmosMsg<ProvenanceMsg> },
     ReflectSubMsg { msgs: Vec<SubMsg<CustomMsg>> },
     ChangeOwner { owner: String },
 }

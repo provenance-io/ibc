@@ -18,6 +18,9 @@ pub enum ExecuteMsg {
         // Note: we don't handle custom messages on remote chains
         msgs: Vec<CosmosMsg<Empty>>,
     },
+    ProvenanceTest {
+        channel_id: String,
+    },
     CheckRemoteBalance {
         channel_id: String,
     },

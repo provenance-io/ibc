@@ -124,6 +124,10 @@ pub fn ibc_packet_ack(
             let res: AcknowledgementMsg<BalancesResponse> = from_slice(&msg.acknowledgement.data)?;
             acknowledge_balances(deps, env, caller, res)
         }
+        PacketMsg::ProvenanceDispatch { .. } => {
+            let res: AcknowledgementMsg<DispatchResponse> = from_slice(&msg.acknowledgement.data)?;
+            acknowledge_dispatch(deps, caller, res)
+        }
     }
 }
 

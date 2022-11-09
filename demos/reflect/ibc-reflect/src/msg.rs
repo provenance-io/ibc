@@ -1,5 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, ContractResult, CosmosMsg};
+use provwasm_std::ProvenanceMsg;
 
 /// Just needs to know the code_id of a reflect contract to spawn sub-accounts
 #[cw_serde]
@@ -39,11 +40,13 @@ pub struct AccountInfo {
 #[cw_serde]
 pub enum ReflectExecuteMsg {
     ReflectMsg { msgs: Vec<CosmosMsg> },
+    ProvenanceReflectMsg { msg: CosmosMsg<ProvenanceMsg> },
 }
 
 #[cw_serde]
 pub enum PacketMsg {
     Dispatch { msgs: Vec<CosmosMsg> },
+    DispatchProvenance { msg: CosmosMsg<ProvenanceMsg> },
     WhoAmI {},
     Balances {},
 }
