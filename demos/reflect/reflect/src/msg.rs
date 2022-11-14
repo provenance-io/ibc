@@ -8,7 +8,7 @@ pub struct InstantiateMsg {}
 #[cw_serde]
 pub enum ExecuteMsg {
     ReflectMsg { msgs: Vec<CosmosMsg<CustomMsg>> },
-    ReflectProvenanceMsg { msg: CosmosMsg<ProvenanceMsg> },
+    ProvenanceReflectMsg { msg: CosmosMsg<ProvenanceMsg> },
     ReflectSubMsg { msgs: Vec<SubMsg<CustomMsg>> },
     ChangeOwner { owner: String },
 }

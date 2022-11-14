@@ -1,6 +1,6 @@
 {
   "contract_name": "reflect",
-  "contract_version": "0.0.0",
+  "contract_version": "0.0.1",
   "idl_version": "1.0.0",
   "instantiate": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -39,10 +39,10 @@
       {
         "type": "object",
         "required": [
-          "reflect_provenance_msg"
+          "provenance_reflect_msg"
         ],
         "properties": {
-          "reflect_provenance_msg": {
+          "provenance_reflect_msg": {
             "type": "object",
             "required": [
               "msg"

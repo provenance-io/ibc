@@ -108,7 +108,7 @@ pub fn handle_provenance_test(
     accounts(deps.storage).load(channel_id.as_bytes())?;
 
     // construct a packet to send
-    let msg = create_marker(100, "test", provwasm_std::MarkerType::Coin).unwrap();
+    let msg = create_marker(100, "testing123", provwasm_std::MarkerType::Coin).unwrap();
     let packet = PacketMsg::ProvenanceDispatch { msg };
     let msg = IbcMsg::SendPacket {
         channel_id,

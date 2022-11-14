@@ -245,7 +245,7 @@ pub fn ibc_packet_receive(
             PacketMsg::Dispatch { msgs } => receive_dispatch(deps, caller, msgs),
             PacketMsg::WhoAmI {} => receive_who_am_i(deps, caller),
             PacketMsg::Balances {} => receive_balances(deps, caller),
-            PacketMsg::DispatchProvenance { msg } => receive_provenance_dispatch(deps, caller, msg),
+            PacketMsg::ProvenanceDispatch { msg } => receive_provenance_dispatch(deps, caller, msg),
         }
     })()
     .or_else(|e| {

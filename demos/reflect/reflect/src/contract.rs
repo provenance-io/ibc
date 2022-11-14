@@ -32,7 +32,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response<ProvenanceMsg>, ReflectError> {
     match msg {
-        ExecuteMsg::ReflectProvenanceMsg { msg } => try_reflect_provenance(deps, env, info, msg),
+        ExecuteMsg::ProvenanceReflectMsg { msg } => try_reflect_provenance(deps, env, info, msg),
         _ => Ok(Response::new()),
     }
 }

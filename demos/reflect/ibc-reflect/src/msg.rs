@@ -46,7 +46,7 @@ pub enum ReflectExecuteMsg {
 #[cw_serde]
 pub enum PacketMsg {
     Dispatch { msgs: Vec<CosmosMsg> },
-    DispatchProvenance { msg: CosmosMsg<ProvenanceMsg> },
+    ProvenanceDispatch { msg: CosmosMsg<ProvenanceMsg> },
     WhoAmI {},
     Balances {},
 }
