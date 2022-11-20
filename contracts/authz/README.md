@@ -1,2 +1,0 @@
-# Authz Example
-
