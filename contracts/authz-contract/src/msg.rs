@@ -1,4 +1,3 @@
-use cosmwasm_std::Uint64;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +13,8 @@ pub enum ExecuteMsg {
         /// The `to_address`
         to_address: String,
         granter_address: String,
+        denom: String,
+        amount: String,
     },
 }
 

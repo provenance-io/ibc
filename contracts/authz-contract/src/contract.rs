@@ -2,7 +2,6 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
-    Uint64, WasmMsg,
 };
 use cw2::set_contract_version;
 
@@ -33,7 +32,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     // Validate that they sent us good addresses
-    let mut config = Config {
+    let config = Config {
         granter: info.sender,
         allowed: map_validate(deps.api, &msg.allowed)?,
     };
@@ -52,15 +51,26 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    let contract_address = env.contract.address.to_string();
     match msg {
         ExecuteMsg::TransferAuthFunds {
             to_address,
             granter_address,
-        } => execute_transfer(deps, info, to_address, granter_address),
+            denom,
+            amount,
+        } => execute_transfer(
+            deps,
+            info,
+            to_address,
+            granter_address,
+            contract_address,
+            denom,
+            amount,
+        ),
     }
 }
 
@@ -76,25 +86,28 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 pub fn execute_transfer(
     deps: DepsMut,
-    info: MessageInfo,
+    _info: MessageInfo,
     to_address: String,
     granter_address: String,
+    contract_address: String,
+    denom: String,
+    amount: String,
 ) -> Result<Response, ContractError> {
     deps.api.addr_validate(&to_address)?;
     deps.api.addr_validate(&granter_address)?;
-    let config = CONFIG.load(deps.storage)?;
+    deps.api.addr_validate(&contract_address)?;
 
     // send from smart contract to a random address
     let mut send = MsgSend::new();
-    send.from_address = "tp13g9hxkljph90nt2waxtw3a40fkkz0dta3sgztv".to_string(); // bob;s address
-    send.to_address = "tp17dtl0mjt3t77kpuhg2edqzjpszulwhgzxhtkax".to_string(); // alice's address
+    send.from_address = granter_address; // bob;s address
+    send.to_address = to_address; // alice's address
     let mut coin: Coin = Coin::new();
-    coin.denom = "nhash".to_string();
-    coin.amount = "1000000".to_string();
+    coin.denom = denom;
+    coin.amount = amount;
     send.amount = vec![coin];
 
     let mut exec = MsgExec::new();
-    exec.grantee = info.sender.to_string(); // contract address
+    exec.grantee = contract_address; // contract address
     exec.msgs = vec![send.to_any().unwrap()];
     let exec_bytes: Vec<u8> = exec.write_to_bytes().unwrap();
 
