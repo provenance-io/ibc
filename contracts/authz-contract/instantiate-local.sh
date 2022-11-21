@@ -12,4 +12,4 @@ fi
 
 #INIT='{"allowed": ["tp1gvc0l4upc88arx673tmg7u3g7zsssnyyle5ph5"]}'
 INIT='{"allowed": []}'
-provenanced tx wasm instantiate "$CODE_ID" "$INIT" --label "authzdemo" --from validator --node http://localhost:26657 --chain-id testing --gas-prices 1900nhash --gas auto --gas-adjustment 1.3 --output json -b block --no-admin -y
+~/provenance/build/provenanced -t tx wasm instantiate "$CODE_ID" "$INIT" --label "authz_demo" --from validator --home ~/provenance/build/run/provenanced  --node http://localhost:26657 --chain-id testing --gas-prices 1905nhash --gas auto --gas-adjustment 2 --output json -b block --no-admin -y

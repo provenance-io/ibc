@@ -1,2 +1,2 @@
 #!/bin/bash
-provenanced tx wasm store output/authzdemo.wasm --from owner --node http://localhost:26657 --chain-id testing --gas-prices 1900nhash --gas auto --gas-adjustment 1.3 --broadcast-mode block -y --output json -b block
+~/provenance/build/provenanced -t tx wasm store /Users/arnabmitra/ibc/contracts/authz-contract/target/wasm32-unknown-unknown/release/authz_demo.wasm --from validator --home ~/provenance/build/run/provenanced --node http://localhost:26657 --chain-id testing --gas-prices 1905nhash --gas auto --gas-adjustment 1.3 --broadcast-mode block -y --output json -b block
