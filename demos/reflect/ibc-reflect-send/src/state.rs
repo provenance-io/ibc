@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, Coin, Storage, Timestamp};
+use cosmwasm_std::{Coin, Storage, Timestamp};
 use cosmwasm_storage::{
     bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
     Singleton,
@@ -11,7 +11,9 @@ pub const PREFIX_ACCOUNTS: &[u8] = b"accounts";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Config {
-    pub admin: Addr,
+    pub ack_received: bool,
+    pub nack_received: bool,
+    pub error_received: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug, PartialEq, Eq)]

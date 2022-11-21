@@ -1,6 +1,6 @@
 [package]
 name = "ibc-reflect-send"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 publish = false

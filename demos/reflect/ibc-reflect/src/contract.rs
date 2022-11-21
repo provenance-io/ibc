@@ -1,18 +1,12 @@
 use cosmwasm_std::{
-    entry_point, from_slice, to_binary, wasm_execute, BankMsg, Binary, CosmosMsg, Deps, DepsMut,
-    Empty, Env, Event, Ibc3ChannelOpenResponse, IbcBasicResponse, IbcChannelCloseMsg,
-    IbcChannelConnectMsg, IbcChannelOpenMsg, IbcChannelOpenResponse, IbcOrder, IbcPacketAckMsg,
-    IbcPacketReceiveMsg, IbcPacketTimeoutMsg, IbcReceiveResponse, MessageInfo, Order,
-    QueryResponse, Reply, Response, StdError, StdResult, SubMsg, SubMsgResponse, SubMsgResult,
-    WasmMsg,
+    entry_point, from_slice, to_binary, Binary, Coin, DepsMut, Empty, Env, Event,
+    Ibc3ChannelOpenResponse, IbcBasicResponse, IbcChannelCloseMsg, IbcChannelConnectMsg,
+    IbcChannelOpenMsg, IbcChannelOpenResponse, IbcOrder, IbcPacketAckMsg, IbcPacketReceiveMsg,
+    IbcPacketTimeoutMsg, IbcReceiveResponse, MessageInfo, Response, StdError, StdResult,
 };
-use provwasm_std::ProvenanceMsg;
 
-use crate::msg::{
-    AccountInfo, AccountResponse, AcknowledgementMsg, BalancesResponse, DispatchResponse,
-    InstantiateMsg, ListAccountsResponse, PacketMsg, QueryMsg, ReflectExecuteMsg, WhoAmIResponse,
-};
-use crate::state::{accounts, accounts_read, config, pending_channel, Config};
+use crate::msg::{AcknowledgementMsg, InstantiateMsg, PacketMsg, UsdfSendResponse};
+use crate::state::{config, Config};
 
 pub const IBC_APP_VERSION: &str = "ibc-reflect-v1";
 pub const RECEIVE_DISPATCH_ID: u64 = 1234;
@@ -23,97 +17,13 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: InstantiateMsg,
+    _msg: InstantiateMsg,
 ) -> StdResult<Response> {
     // we store the reflect_id for creating accounts later
-    let cfg = Config {
-        reflect_code_id: msg.reflect_code_id,
-    };
+    let cfg = Config { counter: 0 };
     config(deps.storage).save(&cfg)?;
 
     Ok(Response::new().add_attribute("action", "instantiate"))
-}
-
-#[entry_point]
-pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> StdResult<Response> {
-    match (reply.id, reply.result) {
-        (RECEIVE_DISPATCH_ID, SubMsgResult::Err(err)) => {
-            Ok(Response::new().set_data(encode_ibc_error(err)))
-        }
-        (INIT_CALLBACK_ID, SubMsgResult::Ok(response)) => handle_init_callback(deps, response),
-        _ => Err(StdError::generic_err("invalid reply id or result")),
-    }
-}
-
-// updated with https://github.com/CosmWasm/wasmd/pull/586 (emitted in keeper.Instantiate)
-fn parse_contract_from_event(events: Vec<Event>) -> Option<String> {
-    events
-        .into_iter()
-        .find(|e| e.ty == "instantiate")
-        .and_then(|ev| {
-            ev.attributes
-                .into_iter()
-                .find(|a| a.key == "_contract_address")
-        })
-        .map(|a| a.value)
-}
-
-pub fn handle_init_callback(deps: DepsMut, response: SubMsgResponse) -> StdResult<Response> {
-    // we use storage to pass info from the caller to the reply
-    let id = pending_channel(deps.storage).load()?;
-    pending_channel(deps.storage).remove();
-
-    // parse contract info from events
-    let contract_addr = match parse_contract_from_event(response.events) {
-        Some(addr) => deps.api.addr_validate(&addr),
-        None => Err(StdError::generic_err(
-            "No _contract_address found in callback events",
-        )),
-    }?;
-
-    // store id -> contract_addr if it is empty
-    // id comes from: `let chan_id = msg.endpoint.channel_id;` in `ibc_channel_connect`
-    accounts(deps.storage).update(id.as_bytes(), |val| -> StdResult<_> {
-        match val {
-            Some(_) => Err(StdError::generic_err(
-                "Cannot register over an existing channel",
-            )),
-            None => Ok(contract_addr),
-        }
-    })?;
-
-    Ok(Response::new().add_attribute("action", "execute_init_callback"))
-}
-
-#[entry_point]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<QueryResponse> {
-    match msg {
-        QueryMsg::Account { channel_id } => to_binary(&query_account(deps, channel_id)?),
-        QueryMsg::ListAccounts {} => to_binary(&query_list_accounts(deps)?),
-    }
-}
-
-pub fn query_account(deps: Deps, channel_id: String) -> StdResult<AccountResponse> {
-    let account = accounts_read(deps.storage).load(channel_id.as_bytes())?;
-    Ok(AccountResponse {
-        account: Some(account.into()),
-    })
-}
-
-pub fn query_list_accounts(deps: Deps) -> StdResult<ListAccountsResponse> {
-    let accounts: StdResult<Vec<_>> = accounts_read(deps.storage)
-        .range(None, None, Order::Ascending)
-        .map(|item| {
-            let (key, account) = item?;
-            Ok(AccountInfo {
-                account: account.into(),
-                channel_id: String::from_utf8(key)?,
-            })
-        })
-        .collect();
-    Ok(ListAccountsResponse {
-        accounts: accounts?,
-    })
 }
 
 #[entry_point]
@@ -125,7 +35,7 @@ pub fn ibc_channel_open(
 ) -> StdResult<IbcChannelOpenResponse> {
     let channel = msg.channel();
 
-    if channel.order != IbcOrder::Ordered {
+    if channel.order != IbcOrder::Unordered {
         return Err(StdError::generic_err("Only supports ordered channels"));
     }
 
@@ -154,23 +64,10 @@ pub fn ibc_channel_connect(
     msg: IbcChannelConnectMsg,
 ) -> StdResult<IbcBasicResponse> {
     let channel = msg.channel();
-    let cfg = config(deps.storage).load()?;
+    let _cfg = config(deps.storage).load()?;
     let chan_id = &channel.endpoint.channel_id;
 
-    let msg = WasmMsg::Instantiate {
-        admin: None,
-        code_id: cfg.reflect_code_id,
-        msg: b"{}".into(),
-        funds: vec![],
-        label: format!("ibc-reflect-{}", chan_id),
-    };
-    let msg = SubMsg::reply_on_success(msg, INIT_CALLBACK_ID);
-
-    // store the channel id for the reply handler
-    pending_channel(deps.storage).save(chan_id)?;
-
     Ok(IbcBasicResponse::new()
-        .add_submessage(msg)
         .add_attribute("action", "ibc_connect")
         .add_attribute("channel_id", chan_id)
         .add_event(Event::new("ibc").add_attribute("channel", "connect")))
@@ -181,37 +78,18 @@ pub fn ibc_channel_connect(
 /// We also delete the channel entry from accounts.
 pub fn ibc_channel_close(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     msg: IbcChannelCloseMsg,
 ) -> StdResult<IbcBasicResponse> {
     let channel = msg.channel();
     // get contract address and remove lookup
     let channel_id = channel.endpoint.channel_id.as_str();
-    let reflect_addr = accounts(deps.storage).load(channel_id.as_bytes())?;
-    accounts(deps.storage).remove(channel_id.as_bytes());
-
-    // transfer current balance if any (steal the money)
-    let amount = deps.querier.query_all_balances(&reflect_addr)?;
-    let messages: Vec<SubMsg<Empty>> = if !amount.is_empty() {
-        let bank_msg = BankMsg::Send {
-            to_address: env.contract.address.into(),
-            amount,
-        };
-        let reflect_msg = ReflectExecuteMsg::ReflectMsg {
-            msgs: vec![bank_msg.into()],
-        };
-        let wasm_msg = wasm_execute(reflect_addr, &reflect_msg, vec![])?;
-        vec![SubMsg::new(wasm_msg)]
-    } else {
-        vec![]
-    };
-    let steal_funds = !messages.is_empty();
+    let cfg = Config { counter: 0 };
+    config(deps.storage).save(&cfg)?;
 
     Ok(IbcBasicResponse::new()
-        .add_submessages(messages)
         .add_attribute("action", "ibc_close")
-        .add_attribute("channel_id", channel_id)
-        .add_attribute("steal_funds", steal_funds.to_string()))
+        .add_attribute("channel_id", channel_id))
 }
 
 /// this is a no-op just to test how this integrates with wasmd
@@ -242,10 +120,9 @@ pub fn ibc_packet_receive(
         let caller = packet.dest.channel_id;
         let msg: PacketMsg = from_slice(&packet.data)?;
         match msg {
-            PacketMsg::Dispatch { msgs } => receive_dispatch(deps, caller, msgs),
-            PacketMsg::WhoAmI {} => receive_who_am_i(deps, caller),
-            PacketMsg::Balances {} => receive_balances(deps, caller),
-            PacketMsg::ProvenanceDispatch { msg } => receive_provenance_dispatch(deps, caller, msg),
+            PacketMsg::UsdfSend { sender, funds } => {
+                receive_usdf_send_funds(deps, caller, sender, funds)
+            }
         }
     })()
     .or_else(|e| {
@@ -258,79 +135,45 @@ pub fn ibc_packet_receive(
     })
 }
 
-// processes PacketMsg::WhoAmI variant
-fn receive_who_am_i(deps: DepsMut, caller: String) -> StdResult<IbcReceiveResponse> {
-    let account = accounts(deps.storage).load(caller.as_bytes())?;
-    let response = WhoAmIResponse {
-        account: account.into(),
-    };
-    let acknowledgement = to_binary(&AcknowledgementMsg::Ok(response))?;
-    // and we are golden
-    Ok(IbcReceiveResponse::new()
-        .set_ack(acknowledgement)
-        .add_attribute("action", "receive_who_am_i"))
-}
-
-// processes PacketMsg::Balances variant
-fn receive_balances(deps: DepsMut, caller: String) -> StdResult<IbcReceiveResponse> {
-    let account = accounts(deps.storage).load(caller.as_bytes())?;
-    let balances = deps.querier.query_all_balances(&account)?;
-    let response = BalancesResponse {
-        account: account.into(),
-        balances,
-    };
-    let acknowledgement = to_binary(&AcknowledgementMsg::Ok(response))?;
-    // and we are golden
-    Ok(IbcReceiveResponse::new()
-        .set_ack(acknowledgement)
-        .add_attribute("action", "receive_balances"))
-}
-
 // processes PacketMsg::Dispatch variant
-fn receive_dispatch(
+fn receive_usdf_send_funds(
     deps: DepsMut,
-    caller: String,
-    msgs: Vec<CosmosMsg>,
+    _caller: String,
+    sender: String,
+    funds: Coin,
 ) -> StdResult<IbcReceiveResponse> {
-    // what is the reflect contract here
-    let reflect_addr = accounts(deps.storage).load(caller.as_bytes())?;
+    let mut counter = 0;
+    config(deps.storage).update(|mut cfg| -> StdResult<_> {
+        counter = cfg.counter;
+        cfg.counter = (cfg.counter + 1) % 3;
+        Ok(cfg)
+    })?;
 
-    // let them know we're fine
-    let acknowledgement = to_binary(&AcknowledgementMsg::<DispatchResponse>::Ok(()))?;
-    // create the message to re-dispatch to the reflect contract
-    let reflect_msg = ReflectExecuteMsg::ReflectMsg { msgs };
-    let wasm_msg = wasm_execute(reflect_addr, &reflect_msg, vec![])?;
-
-    // we wrap it in a submessage to properly report errors
-    let msg = SubMsg::reply_on_error(wasm_msg, RECEIVE_DISPATCH_ID);
+    // For testing purposes we are sending different messages
+    let mut ack = to_binary(&AcknowledgementMsg::<UsdfSendResponse>::Ok(
+        UsdfSendResponse {
+            sender: sender.clone(),
+            funds: funds.clone(),
+            success: true,
+        },
+    ))?;
+    if counter == 1 {
+        // Next we send back an ACK with a failure
+        ack = to_binary(&AcknowledgementMsg::<UsdfSendResponse>::Ok(
+            UsdfSendResponse {
+                sender,
+                funds,
+                success: false,
+            },
+        ))?;
+    } else if counter == 2 {
+        // Lastly, we send back an error
+        ack = encode_ibc_error("ERROR!".to_string());
+    }
 
     Ok(IbcReceiveResponse::new()
-        .set_ack(acknowledgement)
-        .add_submessage(msg)
-        .add_attribute("action", "receive_dispatch"))
-}
-
-fn receive_provenance_dispatch(
-    deps: DepsMut,
-    caller: String,
-    msg: CosmosMsg<ProvenanceMsg>,
-) -> StdResult<IbcReceiveResponse> {
-    // what is the reflect contract here
-    let reflect_addr = accounts(deps.storage).load(caller.as_bytes())?;
-
-    // let them know we're fine
-    let acknowledgement = to_binary(&AcknowledgementMsg::<DispatchResponse>::Ok(()))?;
-    // create the message to re-dispatch to the reflect contract
-    let reflect_msg = ReflectExecuteMsg::ProvenanceReflectMsg { msg };
-    let wasm_msg = wasm_execute(reflect_addr, &reflect_msg, vec![])?;
-
-    // we wrap it in a submessage to properly report errors
-    let msg = SubMsg::reply_on_error(wasm_msg, RECEIVE_DISPATCH_ID);
-
-    Ok(IbcReceiveResponse::new()
-        .set_ack(acknowledgement)
-        .add_submessage(msg)
-        .add_attribute("action", "receive_provenance_dispatch"))
+        .set_ack(ack)
+        .add_attribute("action", "receive_usdf_send_funds"))
 }
 
 #[entry_point]

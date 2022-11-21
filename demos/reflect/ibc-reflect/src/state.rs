@@ -13,7 +13,7 @@ pub const PREFIX_ACCOUNTS: &[u8] = b"accounts";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Config {
-    pub reflect_code_id: u64,
+    pub counter: u32,
 }
 
 /// accounts is lookup of channel_id to reflect contract

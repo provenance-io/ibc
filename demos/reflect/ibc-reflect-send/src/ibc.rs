@@ -1,13 +1,11 @@
 use cosmwasm_std::{
-    entry_point, from_slice, to_binary, DepsMut, Env, IbcBasicResponse, IbcChannelCloseMsg,
-    IbcChannelConnectMsg, IbcChannelOpenMsg, IbcMsg, IbcOrder, IbcPacketAckMsg,
-    IbcPacketReceiveMsg, IbcPacketTimeoutMsg, IbcReceiveResponse, StdError, StdResult,
+    entry_point, from_slice, DepsMut, Env, IbcBasicResponse, IbcChannelCloseMsg,
+    IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder, IbcPacketAckMsg, IbcPacketReceiveMsg,
+    IbcPacketTimeoutMsg, IbcReceiveResponse, StdError, StdResult,
 };
 
-use crate::ibc_msg::{
-    AcknowledgementMsg, BalancesResponse, DispatchResponse, PacketMsg, WhoAmIResponse,
-};
-use crate::state::{accounts, AccountData};
+use crate::ibc_msg::{AcknowledgementMsg, PacketMsg, UsdfSendResponse};
+use crate::state::{accounts, config, AccountData};
 
 pub const IBC_APP_VERSION: &str = "ibc-reflect-v1";
 
@@ -20,7 +18,7 @@ pub const PACKET_LIFETIME: u64 = 60 * 60;
 pub fn ibc_channel_open(_deps: DepsMut, _env: Env, msg: IbcChannelOpenMsg) -> StdResult<()> {
     let channel = msg.channel();
 
-    if channel.order != IbcOrder::Ordered {
+    if channel.order != IbcOrder::Unordered {
         return Err(StdError::generic_err("Only supports ordered channels"));
     }
     if channel.version.as_str() != IBC_APP_VERSION {
@@ -43,10 +41,9 @@ pub fn ibc_channel_open(_deps: DepsMut, _env: Env, msg: IbcChannelOpenMsg) -> St
 }
 
 #[entry_point]
-/// once it's established, we send a WhoAmI message
 pub fn ibc_channel_connect(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     msg: IbcChannelConnectMsg,
 ) -> StdResult<IbcBasicResponse> {
     let channel = msg.channel();
@@ -57,16 +54,7 @@ pub fn ibc_channel_connect(
     let data = AccountData::default();
     accounts(deps.storage).save(channel_id.as_bytes(), &data)?;
 
-    // construct a packet to send
-    let packet = PacketMsg::WhoAmI {};
-    let msg = IbcMsg::SendPacket {
-        channel_id: channel_id.clone(),
-        data: to_binary(&packet)?,
-        timeout: env.block.time.plus_seconds(PACKET_LIFETIME).into(),
-    };
-
     Ok(IbcBasicResponse::new()
-        .add_message(msg)
         .add_attribute("action", "ibc_connect")
         .add_attribute("channel_id", channel_id))
 }
@@ -104,7 +92,7 @@ pub fn ibc_packet_receive(
 #[entry_point]
 pub fn ibc_packet_ack(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     msg: IbcPacketAckMsg,
 ) -> StdResult<IbcBasicResponse> {
     // which local channel was this packet send from
@@ -112,108 +100,52 @@ pub fn ibc_packet_ack(
     // we need to parse the ack based on our request
     let packet: PacketMsg = from_slice(&msg.original_packet.data)?;
     match packet {
-        PacketMsg::Dispatch { .. } => {
-            let res: AcknowledgementMsg<DispatchResponse> = from_slice(&msg.acknowledgement.data)?;
-            acknowledge_dispatch(deps, caller, res)
-        }
-        PacketMsg::WhoAmI {} => {
-            let res: AcknowledgementMsg<WhoAmIResponse> = from_slice(&msg.acknowledgement.data)?;
-            acknowledge_who_am_i(deps, caller, res)
-        }
-        PacketMsg::Balances {} => {
-            let res: AcknowledgementMsg<BalancesResponse> = from_slice(&msg.acknowledgement.data)?;
-            acknowledge_balances(deps, env, caller, res)
-        }
-        PacketMsg::ProvenanceDispatch { .. } => {
-            let res: AcknowledgementMsg<DispatchResponse> = from_slice(&msg.acknowledgement.data)?;
-            acknowledge_dispatch(deps, caller, res)
+        PacketMsg::UsdfSend { .. } => {
+            let res: AcknowledgementMsg<UsdfSendResponse> = from_slice(&msg.acknowledgement.data)?;
+            acknowledge_usdf_send(deps, caller, res)
         }
     }
 }
 
-// receive PacketMsg::Dispatch response
-#[allow(clippy::unnecessary_wraps)]
-fn acknowledge_dispatch(
-    _deps: DepsMut,
-    _caller: String,
-    _ack: AcknowledgementMsg<DispatchResponse>,
-) -> StdResult<IbcBasicResponse> {
-    // TODO: actually handle success/error?
-    Ok(IbcBasicResponse::new().add_attribute("action", "acknowledge_dispatch"))
-}
-
 // receive PacketMsg::WhoAmI response
 // store address info in accounts info
-fn acknowledge_who_am_i(
+fn acknowledge_usdf_send(
     deps: DepsMut,
-    caller: String,
-    ack: AcknowledgementMsg<WhoAmIResponse>,
+    _caller: String,
+    ack: AcknowledgementMsg<UsdfSendResponse>,
 ) -> StdResult<IbcBasicResponse> {
     // ignore errors (but mention in log)
-    let WhoAmIResponse { account } = match ack {
-        AcknowledgementMsg::Ok(res) => res,
+    let res = match ack {
+        AcknowledgementMsg::Ok(res) => {
+            // Update the ack received state
+            config(deps.storage).update(|mut cfg| -> StdResult<_> {
+                if res.success {
+                    cfg.ack_received = true;
+                } else {
+                    cfg.nack_received = true;
+                }
+
+                Ok(cfg)
+            })?;
+
+            res
+        }
         AcknowledgementMsg::Err(e) => {
+            // Update the nack received state
+            config(deps.storage).update(|mut cfg| -> StdResult<_> {
+                cfg.error_received = true;
+                Ok(cfg)
+            })?;
+
             return Ok(IbcBasicResponse::new()
-                .add_attribute("action", "acknowledge_who_am_i")
-                .add_attribute("error", e))
+                .add_attribute("action", "acknowledge_usdf_send")
+                .add_attribute("error", e));
         }
     };
 
-    accounts(deps.storage).update(caller.as_bytes(), |acct| -> StdResult<_> {
-        match acct {
-            Some(mut acct) => {
-                // set the account the first time
-                if acct.remote_addr.is_none() {
-                    acct.remote_addr = Some(account);
-                }
-                Ok(acct)
-            }
-            None => Err(StdError::generic_err("no account to update")),
-        }
-    })?;
-
-    Ok(IbcBasicResponse::new().add_attribute("action", "acknowledge_who_am_i"))
-}
-
-// receive PacketMsg::Balances response
-fn acknowledge_balances(
-    deps: DepsMut,
-    env: Env,
-    caller: String,
-    ack: AcknowledgementMsg<BalancesResponse>,
-) -> StdResult<IbcBasicResponse> {
-    // ignore errors (but mention in log)
-    let BalancesResponse { account, balances } = match ack {
-        AcknowledgementMsg::Ok(res) => res,
-        AcknowledgementMsg::Err(e) => {
-            return Ok(IbcBasicResponse::new()
-                .add_attribute("action", "acknowledge_balances")
-                .add_attribute("error", e))
-        }
-    };
-
-    accounts(deps.storage).update(caller.as_bytes(), |acct| -> StdResult<_> {
-        match acct {
-            Some(acct) => {
-                if let Some(old_addr) = acct.remote_addr {
-                    if old_addr != account {
-                        return Err(StdError::generic_err(format!(
-                            "remote account changed from {} to {}",
-                            old_addr, account
-                        )));
-                    }
-                }
-                Ok(AccountData {
-                    last_update_time: env.block.time,
-                    remote_addr: Some(account),
-                    remote_balance: balances,
-                })
-            }
-            None => Err(StdError::generic_err("no account to update")),
-        }
-    })?;
-
-    Ok(IbcBasicResponse::new().add_attribute("action", "acknowledge_balances"))
+    Ok(IbcBasicResponse::new()
+        .add_attribute("action", "acknowledge_usdf_send")
+        .add_attribute("success", res.success.to_string()))
 }
 
 #[entry_point]
@@ -229,8 +161,8 @@ pub fn ibc_packet_timeout(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contract::{execute, instantiate, query};
-    use crate::msg::{AccountResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+    use crate::contract::{execute, instantiate};
+    use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
     use cosmwasm_std::testing::{
         mock_dependencies, mock_env, mock_ibc_channel_connect_ack, mock_ibc_channel_open_init,
