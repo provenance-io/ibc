@@ -1,6 +1,6 @@
 {
   "contract_name": "ibc-reflect-send",
-  "contract_version": "0.0.3",
+  "contract_version": "0.0.4",
   "idl_version": "1.0.0",
   "instantiate": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -23,19 +23,19 @@
             "type": "object",
             "required": [
               "channel_id",
+              "from_address",
               "funds",
-              "granter_address",
               "to_address"
             ],
             "properties": {
               "channel_id": {
                 "type": "string"
               },
+              "from_address": {
+                "type": "string"
+              },
               "funds": {
                 "$ref": "#/definitions/Coin"
-              },
-              "granter_address": {
-                "type": "string"
               },
               "to_address": {
                 "type": "string"

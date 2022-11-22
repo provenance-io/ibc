@@ -10,7 +10,7 @@ pub enum ExecuteMsg {
     UsdfSend {
         channel_id: String,
         funds: Coin,
-        granter_address: String,
+        from_address: String,
         to_address: String,
     },
 }

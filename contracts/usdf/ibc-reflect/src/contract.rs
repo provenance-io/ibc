@@ -1,13 +1,11 @@
 use cosmwasm_std::{
-    entry_point, from_slice, to_binary, Binary, Coin, DepsMut, Empty, Env, Event,
+    entry_point, from_slice, to_binary, Addr, Binary, Coin, DepsMut, Empty, Env, Event,
     Ibc3ChannelOpenResponse, IbcBasicResponse, IbcChannelCloseMsg, IbcChannelConnectMsg,
     IbcChannelOpenMsg, IbcChannelOpenResponse, IbcOrder, IbcPacketAckMsg, IbcPacketReceiveMsg,
-    IbcPacketTimeoutMsg, IbcReceiveResponse, MessageInfo, Response, StdError, StdResult, Addr,
+    IbcPacketTimeoutMsg, IbcReceiveResponse, MessageInfo, Response, StdError, StdResult,
 };
 
-use provwasm_std:: {
-    transfer_marker_coins, ProvenanceMsg,
-};
+use provwasm_std::{transfer_marker_coins, ProvenanceMsg};
 
 use crate::msg::{AcknowledgementMsg, InstantiateMsg, PacketMsg, UsdfSendResponse};
 use crate::state::{config, Config};
@@ -164,11 +162,10 @@ fn receive_usdf_send_funds(
             .add_attribute("action", "receive_usdf_send_funds"));
     }
 
-
-    let response  = transfer_marker_coins(
+    let response = transfer_marker_coins(
         funds.amount.u128(),
         &funds.denom,
-       Addr::unchecked(to_address),
+        Addr::unchecked(to_address),
         Addr::unchecked(from_address),
     );
     let msg = response.unwrap();
@@ -221,8 +218,7 @@ mod tests {
 
     fn setup() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
         let mut deps = mock_dependencies();
-        let msg = InstantiateMsg {
-        };
+        let msg = InstantiateMsg {};
         let info = mock_info(CREATOR, &[]);
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());

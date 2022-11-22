@@ -30,17 +30,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::UsdfSend {
             channel_id,
             funds,
-            granter_address,
+            from_address,
             to_address,
-        } => handle_usdf_send(
-            deps,
-            env,
-            info,
-            channel_id,
-            granter_address,
-            to_address,
-            funds,
-        ),
+        } => handle_usdf_send(deps, env, info, channel_id, from_address, to_address, funds),
     }
 }
 
@@ -65,7 +57,7 @@ pub fn handle_usdf_send(
     env: Env,
     _info: MessageInfo,
     channel_id: String,
-    granter_address: String,
+    from_address: String,
     to_address: String,
     funds: Coin,
 ) -> StdResult<Response> {
@@ -74,7 +66,7 @@ pub fn handle_usdf_send(
 
     // construct a packet to send
     let packet = PacketMsg::UsdfSend {
-        granter_address,
+        from_address,
         to_address,
         funds,
     };

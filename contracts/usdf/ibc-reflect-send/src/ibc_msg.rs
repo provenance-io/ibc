@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum PacketMsg {
     UsdfSend {
-        granter_address: String,
+        from_address: String,
         to_address: String,
         funds: Coin,
     },
