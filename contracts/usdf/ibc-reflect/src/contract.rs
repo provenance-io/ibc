@@ -1,19 +1,16 @@
 use cosmwasm_std::{
-    entry_point, from_slice, to_binary, Binary, Coin, CosmosMsg, DepsMut, Empty, Env, Event,
+    entry_point, from_slice, to_binary, Binary, Coin, DepsMut, Empty, Env, Event,
     Ibc3ChannelOpenResponse, IbcBasicResponse, IbcChannelCloseMsg, IbcChannelConnectMsg,
     IbcChannelOpenMsg, IbcChannelOpenResponse, IbcOrder, IbcPacketAckMsg, IbcPacketReceiveMsg,
-    IbcPacketTimeoutMsg, IbcReceiveResponse, MessageInfo, Response, StdError, StdResult,
+    IbcPacketTimeoutMsg, IbcReceiveResponse, MessageInfo, Response, StdError, StdResult, Addr,
+};
+
+use provwasm_std:: {
+    transfer_marker_coins, ProvenanceMsg,
 };
 
 use crate::msg::{AcknowledgementMsg, InstantiateMsg, PacketMsg, UsdfSendResponse};
 use crate::state::{config, Config};
-
-// Authz exec for protobuf
-use protobuf::Message;
-include!("protos/mod.rs");
-use CosmosAuthz::MsgExec;
-use CosmosBankSend::Coin as CosmosBankSendCoin;
-use CosmosBankSend::MsgSend;
 
 pub const IBC_APP_VERSION: &str = "ibc-reflect-v1";
 pub const RECEIVE_DISPATCH_ID: u64 = 1234;
@@ -119,7 +116,7 @@ pub fn ibc_packet_receive(
     deps: DepsMut,
     env: Env,
     msg: IbcPacketReceiveMsg,
-) -> StdResult<IbcReceiveResponse> {
+) -> StdResult<IbcReceiveResponse<ProvenanceMsg>> {
     // put this in a closure so we can convert all error responses into acknowledgements
     (|| {
         let packet = msg.packet;
@@ -128,10 +125,10 @@ pub fn ibc_packet_receive(
         let msg: PacketMsg = from_slice(&packet.data)?;
         match msg {
             PacketMsg::UsdfSend {
-                granter_address,
+                from_address,
                 to_address,
                 funds,
-            } => receive_usdf_send_funds(deps, env, caller, granter_address, to_address, funds),
+            } => receive_usdf_send_funds(deps, env, caller, from_address, to_address, funds),
         }
     })()
     .or_else(|e| {
@@ -147,12 +144,12 @@ pub fn ibc_packet_receive(
 // processes PacketMsg::Dispatch variant
 fn receive_usdf_send_funds(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     _caller: String,
-    granter_address: String,
+    from_address: String,
     to_address: String,
     funds: Coin,
-) -> StdResult<IbcReceiveResponse> {
+) -> StdResult<IbcReceiveResponse<ProvenanceMsg>> {
     // Must be a valid address
     if deps.api.addr_validate(&to_address).is_err() {
         let ack = encode_ibc_error(format!("Invalid to_address: {}", to_address));
@@ -160,32 +157,21 @@ fn receive_usdf_send_funds(
             .set_ack(ack)
             .add_attribute("action", "receive_usdf_send_funds"));
     }
-    if deps.api.addr_validate(&granter_address).is_err() {
-        let ack = encode_ibc_error(format!("Invalid granter_address: {}", granter_address));
+    if deps.api.addr_validate(&from_address).is_err() {
+        let ack = encode_ibc_error(format!("Invalid granter_address: {}", from_address));
         return Ok(IbcReceiveResponse::new()
             .set_ack(ack)
             .add_attribute("action", "receive_usdf_send_funds"));
     }
 
-    // send from smart contract to a random address
-    let mut send = MsgSend::new();
-    send.from_address = granter_address; // bob;s address
-    send.to_address = to_address; // alice's address
 
-    let mut coin = CosmosBankSendCoin::new();
-    coin.denom = funds.denom;
-    coin.amount = funds.amount.to_string();
-    send.amount = vec![coin];
-
-    let mut exec = MsgExec::new();
-    exec.grantee = env.contract.address.to_string(); // contract address
-    exec.msgs = vec![send.to_any().unwrap()];
-    let exec_bytes: Vec<u8> = exec.write_to_bytes().unwrap();
-
-    let msg = CosmosMsg::Stargate {
-        type_url: "/cosmos.authz.v1beta1.MsgExec".to_string(),
-        value: Binary::from(exec_bytes),
-    };
+    let response  = transfer_marker_coins(
+        funds.amount.u128(),
+        &funds.denom,
+       Addr::unchecked(to_address),
+        Addr::unchecked(from_address),
+    );
+    let msg = response.unwrap();
 
     let ack = to_binary(&AcknowledgementMsg::<UsdfSendResponse>::Ok(
         UsdfSendResponse {},
@@ -236,7 +222,6 @@ mod tests {
     fn setup() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
         let mut deps = mock_dependencies();
         let msg = InstantiateMsg {
-            reflect_code_id: REFLECT_ID,
         };
         let info = mock_info(CREATOR, &[]);
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();

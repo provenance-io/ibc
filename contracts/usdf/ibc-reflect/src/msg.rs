@@ -12,7 +12,7 @@ pub enum QueryMsg {}
 #[cw_serde]
 pub enum PacketMsg {
     UsdfSend {
-        granter_address: String,
+        from_address: String,
         to_address: String,
         funds: Coin,
     },
